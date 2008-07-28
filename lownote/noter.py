@@ -110,6 +110,6 @@ class Noter(object):
         by note; this is useful for the initial population of the note
         interface."""
 
-        for note in self.session.query(Note):
+        for note in self.session.query(Note).order_by(Note.c.date.desc()):
             yield note
 

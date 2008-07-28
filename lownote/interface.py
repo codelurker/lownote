@@ -120,6 +120,10 @@ class MainWindow(Window):
             )
         self.seperator.window.vline(curses.ACS_VLINE, height)
 
+    def hard_update(self):
+        self.window.redrawwin()
+        self.seperator.window.redrawwin()
+
     def update(self):
         super(MainWindow, self).update()
         self.seperator.update()
@@ -143,7 +147,7 @@ class IndexWindow(Window):
         super(IndexWindow, self).__init__(y, x, height, width)
         self.notes = []
         self.last_selected = self.selected = -1
-        self.echo("\x03YB\x03Notes:", pad=True, center=True)
+        self.echo("\x03BR\x03Notes:", pad=True, center=True)
 
     def append(self, note):
         self.notes.append(note)
@@ -187,6 +191,8 @@ class IndexWindow(Window):
 # redraws if last_selected and selected don't match:
         self.last_selected = self.selected
 
+    def hard_update(self):
+        self.window.redrawwin()
 
     def update(self):
         if self.selected != self.last_selected:
@@ -263,8 +269,18 @@ class Interface(object):
             win.update()
         curses.doupdate()
 
+    def hard_update(self):
+        for win in (self.note_index, self.note_display):
+            win.hard_update()
+        self.update()
+
     def get_key(self):
         key = self.note_display.window.getkey()
+        try:
+            key = self.note_display.window.getkey()
+        except curses.error, e:
+            #self.hard_update()
+            key = None
         return key
 
     def handle_events(self):
