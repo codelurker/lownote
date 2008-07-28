@@ -42,6 +42,7 @@ def load_rc(options):
     except IOError, e:
         if not rc_default:
             print "Could not read rc file: %s" % (options.rc_path,)
+            raise SystemExit
         return options
 
     config = parse_rc(f)
@@ -57,7 +58,6 @@ def load_rc(options):
             continue
         if getattr(options, key) == "DEFAULT":
             setattr(options, key, config[key])
-
     options.db_path = os.path.expanduser(options.db_path)
     _makedir(options.db_path)
     return options

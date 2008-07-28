@@ -2,9 +2,19 @@
 import datetime
 
 class Note(object):
-    def __init__(self, body):
+    def __init__(self, body, due_date):
         self.body = body
         self.date = datetime.datetime.now()
+        if due_date is not None:
+            if len(due_date) == 8:
+                format = "%Y%m%d"
+            elif len(due_date) == 6:
+                format = "%y%m%d"
+            else:
+                raise ValueError("Format must be YYYYMMDD or YYMMDD.")
+            self.due_date = datetime.datetime.strptime(due_date, format)
+        else:
+            self.due_date = None
 
     def __repr__(self):
         return self.body[:30]

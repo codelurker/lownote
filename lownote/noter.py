@@ -28,6 +28,7 @@ class Noter(object):
             Column('id', Integer, primary_key=True, index=True),
             Column('body', String(4000)),
             Column('date', DateTime()),
+            Column('due_date', DateTime()),
        )
 
         keywords_table = Table('keywords', self.metadata,
@@ -57,6 +58,12 @@ class Noter(object):
 
         self.session = Session()
 
+    def get_stored_keywords(self):
+        """Retrieve and yield all keywords from database."""
+
+        for keyword in self.session.query(Keyword):
+            yield keyword.keyword
+
     def get_keywords(self, body):
         """Parse the body of the note and yield keywords as they are found.
         Note that this method also needs to check if any keywords are found in
@@ -79,14 +86,14 @@ class Noter(object):
                 yield word
 
 
-    def add_note(self, body, topics=[]):
+    def add_note(self, body, due_date=None, topics=[]):
         """The body of the note is always required, otherwise there's no note
         to add. "topics" and "keywords" are not required but they must always
         be a list, even if it contains one element (so as not to need any type
         checking). This method needs to process the note (i.e. parse for
         keywords) and add it to the database."""
         
-        note = Note(body)
+        note = Note(body, due_date)
         self.session.save(note)
 
         for topic in topics:
@@ -95,5 +102,14 @@ class Noter(object):
         for keyword in self.get_keywords(body):
             note.keywords.append(Keyword(keyword))
 
+        note.body = note.body.replace('%%', '')
         self.session.commit()
+
+    def get_notes(self):
+        """The get_notes method reads through the database and yields note
+        by note; this is useful for the initial population of the note
+        interface."""
+
+        for note in self.session.query(Note):
+            yield note
 
