@@ -105,11 +105,22 @@ class Noter(object):
         note.body = note.body.replace('%%', '')
         self.session.commit()
 
+    def delete_note(self, note):
+        """Take a note and remove it from the db by primary key (id)."""
+        self.session.delete(note)
+        self.session.commit()
+
     def get_notes(self):
         """The get_notes method reads through the database and yields note
         by note; this is useful for the initial population of the note
         interface."""
 
-        for note in self.session.query(Note).order_by(Note.c.date.desc()):
+        for note in self.session.query(Note).order_by(Note.c.id.desc()):
             yield note
 
+    def get_new_notes(self, offset):
+        """See if any new notes past the given offset are in the database and
+        yield them."""
+        query = self.session.query(Note).order_by(Note.c.id.asc())
+        for note in query[offset:]:
+            yield note

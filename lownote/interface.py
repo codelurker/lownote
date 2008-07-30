@@ -33,6 +33,7 @@ class Window(object):
 
         self.window = curses.newwin(height, width, y, x)
         self.window.keypad(1)
+        self.window.scrollok(True)
         self.scrolling = 0
         self.width = width
         self.height = height
@@ -96,6 +97,13 @@ class Window(object):
 
             self.echo_colour(section[1], fg, bg, pad, center)
 
+    def insert_line(self, string, x, pad=False, center=False):
+        self.window.move(x - self.scrolling + 1, 0)
+        self.window.move(1,0)
+        self.window.insertln()
+        self.window.move(x - self.scrolling + 1, 0)
+        self.echo_line(string, pad, center)
+
     def clear_line(self, index):
 # Increment index by 1 to ignore the "title" of the index window:
         index += 1
@@ -147,12 +155,38 @@ class IndexWindow(Window):
         super(IndexWindow, self).__init__(y, x, height, width)
         self.notes = []
         self.last_selected = self.selected = -1
-        self.echo("\x03BR\x03Notes:", pad=True, center=True)
+        self.echo_title()
 
+    def echo_title(self):
+        self.echo("\x03BR\x03Notes:", pad=True, center=True)
+        
+    def get_note_count(self):
+        return len(self.notes)
+
+    def repopulate(self):
+        self.clear()
+        self.echo_title()
+        for note in self.notes:
+            self.echo_note(note)
+        self.update()
+        
     def append(self, note):
         self.notes.append(note)
         self.echo_note(note)
         self.update()
+
+    def delete(self, x):
+        if not self.notes:
+            return
+        if len(self.notes) < x:
+            return
+        del self.notes[x]
+        self.repopulate()
+
+    def insert(self, note, x):
+        self.notes.insert(x, note)
+        self.repopulate()
+        self.selected += 1
 
     def echo_note(self, note):
         self.echo('\x03G\x03' + note.body[:self.width], pad=True)
@@ -215,16 +249,19 @@ class Interface(object):
             else: j = -1
             curses.init_pair(i+1, i % 8, j)
 
-    def __init__(self, scr):
+    def __init__(self, scr, callback=None):
         """Work out how big to draw the columns and initialise them as separate
         windows. The curses screen comes externally so the caller can deal with
-        the curses wrapper in the main script."""
+        the curses wrapper in the main script. The callback specified is for
+        any processing that needs to be done by the caller when the interface
+        does something (i.e. when a user hits a key)."""
 
         self.make_colours()
         curses.curs_set(0)
         self.scr = scr
         height, width = self.scr.getmaxyx()
         
+        self.callback = callback
         self.keywords = set()
         index_width = int(width * 0.25)
         main_width = width - index_width
@@ -239,6 +276,7 @@ class Interface(object):
             keys['exit']: self.exit,
             keys['up']: self.up,
             keys['down']: self.down,
+            keys['delete']: self.delete,
         }
         
     def add_keyword(self, keyword):
@@ -248,6 +286,8 @@ class Interface(object):
         raise SystemExit
 
     def up(self):
+        if not self.note_index.notes:
+            return
         self.note_index.up()
         self.note_display.display_note(
             self.note_index.notes[self.note_index.selected],
@@ -255,14 +295,29 @@ class Interface(object):
             )
 
     def down(self):
+        if not self.note_index.notes:
+            return
         self.note_index.down()
         self.note_display.display_note(
             self.note_index.notes[self.note_index.selected],
             self.keywords
             )
 
+    def delete(self):
+        if self.callback is not None:
+            self.callback(self,
+                    delete=self.note_index.notes[self.note_index.selected])
+        self.note_index.delete(self.note_index.selected)
+
+    def insert_note(self, note, x=0):
+        self.note_index.insert(note, x)
+
     def add_note(self, note):
         self.note_index.append(note)
+
+    @property
+    def index_count(self):
+        return self.note_index.get_note_count()
 
     def update(self):
         for win in (self.note_index, self.note_display):
@@ -288,3 +343,5 @@ class Interface(object):
             key = self.get_key()
             if key in self.keys_dispatch:
                 self.keys_dispatch[key]()
+            if self.callback is not None:
+                self.callback(self)
