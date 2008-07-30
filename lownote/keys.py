@@ -1,5 +1,6 @@
 keys = {
-    'exit': 'x',
+    'exit': 'q',
     'up': 'k',
     'down': 'j',
+    'delete': 'd',
 }
