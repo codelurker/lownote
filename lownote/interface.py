@@ -88,12 +88,12 @@ class Window(object):
         # Grab "\x03XX\x03foobarbaz" strings - the lookahead assert is
         # necessary to make it match up to the next \x03 or $ without actually
         # grabbing it (which would skip the next match):
-        for section in re.findall("\x03([A-Z][A-Z]?)\x03(.*?)(?=(?:\x03|$))",
+        for section in re.findall("\x03([a-zA-Z][a-zA-Z]?)\x03(.*?)(?=(?:\x03|$))",
                                         string):
-            fg = section[0][0]
+            fg = section[0][0].upper()
             bg = None
             if len(section[0]) == 2:
-                bg = section[0][1]
+                bg = section[0][1].upper()
 
             self.echo_colour(section[1], fg, bg, pad, center)
 
@@ -140,11 +140,16 @@ class MainWindow(Window):
         self.clear()
         self.echo("\x03Y\x03Note made on: \x03G\x03%s\n"
                 % note.date.strftime("%c"))
+        if note.topics:
+            topics_string = ", ".join(x.topic for x in note.topics)
+        else:
+            topics_string = "\x03b\x03[None]"
         self.echo("\x03Y\x03Listed under topics: \x03G\x03%s\n"
-                % ", ".join(x.topic for x in note.topics))
+                % (topics_string,))
         body = note.body
         for keyword in keywords:
-            body = body.replace(keyword, '\x03R\x03%s\x03B\x03' % keyword)
+            body = re.sub("(?i)(%s)" % (keyword,),
+                '\x03R\x03\\1\x03B\x03', body)
         body = self.wrap(body)
 
         self.echo("\x03B\x03%s" % body)
@@ -168,6 +173,9 @@ class IndexWindow(Window):
         self.echo_title()
         for note in self.notes:
             self.echo_note(note)
+        # This marks the current selection as dirty, so the selection will be
+        # redrawn, e.g. after deletion/insertion:
+        self.last_selected = -1
         self.update()
         
     def append(self, note):
@@ -181,6 +189,8 @@ class IndexWindow(Window):
         if len(self.notes) < x:
             return
         del self.notes[x]
+        if x <= len(self.notes):
+            self.selected -= 1
         self.repopulate()
 
     def insert(self, note, x):
@@ -249,12 +259,13 @@ class Interface(object):
             else: j = -1
             curses.init_pair(i+1, i % 8, j)
 
-    def __init__(self, scr, callback=None):
+    def __init__(self, scr, callback=None, timeout=500):
         """Work out how big to draw the columns and initialise them as separate
         windows. The curses screen comes externally so the caller can deal with
         the curses wrapper in the main script. The callback specified is for
         any processing that needs to be done by the caller when the interface
-        does something (i.e. when a user hits a key)."""
+        does something (i.e. when a user hits a key or the timeout is
+        reached)."""
 
         self.make_colours()
         curses.curs_set(0)
@@ -268,6 +279,7 @@ class Interface(object):
 
         self.note_index = IndexWindow(0, 0, height, index_width)
         self.note_display = MainWindow(0, index_width, height, main_width)
+        self.note_display.window.timeout(timeout)
         self.update()
 
         self.selected = self.note_index
@@ -330,7 +342,6 @@ class Interface(object):
         self.update()
 
     def get_key(self):
-        key = self.note_display.window.getkey()
         try:
             key = self.note_display.window.getkey()
         except curses.error, e:
