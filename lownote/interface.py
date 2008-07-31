@@ -129,8 +129,8 @@ class MainWindow(Window):
         self.seperator.window.vline(curses.ACS_VLINE, height)
 
     def hard_update(self):
-        self.window.redrawwin()
-        self.seperator.window.redrawwin()
+        self.window.touchwin()
+        self.seperator.window.touchwin()
 
     def update(self):
         super(MainWindow, self).update()
@@ -236,7 +236,7 @@ class IndexWindow(Window):
         self.last_selected = self.selected
 
     def hard_update(self):
-        self.window.redrawwin()
+        self.window.touchwin()
 
     def update(self):
         if self.selected != self.last_selected:
@@ -345,7 +345,7 @@ class Interface(object):
         try:
             key = self.note_display.window.getkey()
         except curses.error, e:
-            #self.hard_update()
+            self.hard_update()
             key = None
         return key
 
